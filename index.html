@@ -227,10 +227,23 @@ async function analyzeFoodPhoto(){
   error.classList.add("hidden");loading.classList.remove("hidden");
   status.textContent="AI is identifying the food and estimating nutrition…";
   try{
-    const response=await fetch("/api/analyze-food",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({mimeType:match[1],image:match[2]})
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    let response;
+    try {
+      response = await fetch("/api/analyze-food",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({mimeType:match[1],image:match[2]}),
+        signal: controller.signal
+      });
+    } catch (networkError) {
+      if (networkError.name === "AbortError") {
+        throw new Error("Food analysis took too long. The AI service may be busy. Please try again shortly.");
+      }
+      throw networkError;
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const result=await response.json();
     if(!response.ok)throw new Error(result.error||"Food analysis failed.");
     $("scanFoodName").textContent=result.foodName;

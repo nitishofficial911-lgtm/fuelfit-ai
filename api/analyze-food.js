@@ -29,19 +29,36 @@ export default async function handler(req, res) {
 }
 Use kcal for calories and grams for nutrients. All numeric values must be non-negative. If the image is not food, set foodName to "Food not recognised", calories and nutrient values to 0, confidence to "Low", and explain in note. Estimates are approximate, not medical advice.`;
 
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(apiKey), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ inlineData: { mimeType: type, data: image }, }, { text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      })
+    const requestBody = JSON.stringify({
+      contents: [{ parts: [{ inlineData: { mimeType: type, data: image } }, { text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" }
     });
 
-    const payload = await response.json();
+    // Google can temporarily return 503 when model capacity is busy.
+    // Retry a small number of times with exponential backoff.
+    let response;
+    let payload;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(apiKey), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: requestBody
+      });
+
+      if (response.status !== 503 || attempt === 2) {
+        payload = await response.json();
+        break;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempt)));
+    }
+
     if (!response.ok) {
       const detail = payload?.error?.message || "The food analysis service returned an error.";
-      return res.status(response.status === 429 ? 429 : 502).json({ error: detail });
+      const friendly = response.status === 503
+        ? "Google's AI service is temporarily busy. FuelFit tried again automatically, but the service is still unavailable. Please try again shortly."
+        : detail;
+      return res.status(response.status === 429 ? 429 : 502).json({ error: friendly });
     }
 
     const raw = payload?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";

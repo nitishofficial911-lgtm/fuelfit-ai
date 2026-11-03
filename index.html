@@ -185,9 +185,16 @@ $("openFoodCamera").addEventListener("click",async()=>{
     status.textContent="Camera is ready. Position your meal and tap Capture photo.";
   }catch(err){
     stopFoodCamera();
-    status.textContent=(err && err.name==="NotAllowedError")
-      ?"Camera permission was blocked. Allow camera access in your browser settings, then try again."
-      :"Could not open the camera. Check that another app is not using it, or choose a photo below.";
+    const cameraError = err && err.name;
+    const messages = {
+      NotAllowedError: "Camera access is blocked. Tap the site icon beside the address, open Permissions, set Camera to Allow, then reload FuelFit AI.",
+      PermissionDeniedError: "Camera permission was denied. Allow camera access for this website in your browser settings, then reload.",
+      NotFoundError: "No camera was found on this device. You can still upload a food photo below.",
+      NotReadableError: "The camera may be in use by another app. Close other camera apps and try again.",
+      OverconstrainedError: "The requested camera is unavailable. Try again or upload a photo.",
+      SecurityError: "The browser blocked camera access. Open FuelFit AI using its secure HTTPS website address."
+    };
+    status.textContent = messages[cameraError] || "Could not open the camera. Check browser permissions and close other camera apps, or upload a photo below.";
   }
 });
 $("captureFoodPhoto").addEventListener("click",()=>{

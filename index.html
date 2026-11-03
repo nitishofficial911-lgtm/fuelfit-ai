@@ -225,7 +225,7 @@ async function analyzeFoodPhoto(){
   }
   $("scanEmpty").classList.add("hidden");
   $("scanResultContent").classList.add("hidden");
-  error.classList.add("hidden");loading.classList.remove("hidden");
+  error.classList.add("hidden");$("appleDemoFallback").classList.add("hidden");$("logScannedFood").disabled=false;$("logScannedFood").textContent="＋ Add estimate to food journal";loading.classList.remove("hidden");
   status.textContent="AI is identifying the food and estimating nutrition…";
   try{
     // Compress large phone photos before sending them to the AI provider.
@@ -280,6 +280,7 @@ async function analyzeFoodPhoto(){
     $("barProtein").style.width=Math.min(100,result.protein*4)+"%";
     $("barBalance").style.width="0%";
     $("scanResultContent").classList.remove("hidden");
+    $("logScannedFood").disabled=false;$("logScannedFood").textContent="＋ Add estimate to food journal";
     window.lastFoodEstimate=result;
     status.textContent="Analysis complete! Review the estimated nutrition on the right.";
   }catch(err){

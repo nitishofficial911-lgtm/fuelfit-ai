@@ -34,23 +34,39 @@ Use kcal for calories and grams for nutrients. All numeric values must be non-ne
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    // Google can temporarily return 503 when model capacity is busy.
-    // Retry a small number of times with exponential backoff.
+    // Try the primary vision model first, then a lighter vision-capable
+    // model if Google reports temporary capacity overload.
+    const models = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
     let response;
     let payload;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(apiKey), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: requestBody
-      });
+    let usedFallback = false;
 
-      if (response.status !== 503 || attempt === 2) {
-        payload = await response.json();
-        break;
+    for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
+      const model = models[modelIndex];
+      const attempts = modelIndex === 0 ? 2 : 2;
+
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(apiKey), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: requestBody
+        });
+
+        if (response.ok) {
+          payload = await response.json();
+          usedFallback = modelIndex > 0;
+          break;
+        }
+
+        if (response.status !== 503 || attempt === attempts - 1) {
+          payload = await response.json();
+          break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempt)));
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempt)));
+      if (response.ok || response.status !== 503) break;
     }
 
     if (!response.ok) {
@@ -74,7 +90,7 @@ Use kcal for calories and grams for nutrients. All numeric values must be non-ne
     result.foodName = String(result.foodName || "Food estimate").slice(0, 100);
     result.serving = String(result.serving || "Visible portion; amount uncertain").slice(0, 160);
     result.confidence = ["Low", "Medium", "High"].includes(result.confidence) ? result.confidence : "Low";
-    result.note = String(result.note || "Nutrition values are estimates from the photo.").slice(0, 300);
+    result.note = String(result.note || "Nutrition values are estimates from the photo.").slice(0, 300);\n    if (usedFallback) result.note += " (Backup AI model used.)";
     return res.status(200).json(result);
   } catch (error) {
     return res.status(500).json({ error: error.message || "Could not analyse this photo. Please try again." });

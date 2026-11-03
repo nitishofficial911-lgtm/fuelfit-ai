@@ -239,8 +239,12 @@ async function analyzeFoodPhoto(){
     resizedCanvas.height = Math.max(1, Math.round(sourceImage.naturalHeight * scale));
     resizedCanvas.getContext("2d").drawImage(sourceImage, 0, 0, resizedCanvas.width, resizedCanvas.height);
     const compressedDataUrl = resizedCanvas.toDataURL("image/jpeg", 0.78);
-    const match = compressedDataUrl.match(/^data:(image\/jpeg);base64,([\s\\S]+)$/);
-    if(!match) throw new Error("Could not prepare this photo. Please choose another image.");
+    const commaIndex = compressedDataUrl.indexOf(",");
+    if(commaIndex < 0 || !compressedDataUrl.startsWith("data:image/jpeg;base64,")) {
+      throw new Error("Could not prepare this photo. Please choose another image.");
+    }
+    const imageBase64 = compressedDataUrl.slice(commaIndex + 1);
+    if(!imageBase64) throw new Error("The photo could not be compressed. Please choose another image.");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 35000);
@@ -248,7 +252,7 @@ async function analyzeFoodPhoto(){
     try {
       response = await fetch("/api/analyze-food",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({mimeType:match[1],image:match[2]}),
+        body:JSON.stringify({mimeType:"image/jpeg",image:imageBase64}),
         signal: controller.signal
       });
     } catch (networkError) {

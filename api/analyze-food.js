@@ -34,9 +34,7 @@ Use kcal for calories and grams for nutrients. All numeric values must be non-ne
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    // Try the primary vision model first, then a lighter model. Bound
-    // each provider request so a stalled upstream connection cannot hang
-    // the Vercel function indefinitely.
+    // Try each model once with a bounded request timeout.
     const models = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
     let response;
     let payload;
@@ -44,52 +42,37 @@ Use kcal for calories and grams for nutrients. All numeric values must be non-ne
     let lastNetworkError = null;
 
     for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
-      const model = models[modelIndex];
-
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        try {
-          response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(apiKey), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: requestBody,
-            signal: controller.signal
-          });
-        } catch (networkError) {
-          lastNetworkError = networkError;
-          response = undefined;
-        } finally {
-          clearTimeout(timeoutId);
-        }
-
-        if (!response) {
-          if (attempt === 0) continue;
-          break;
-        }
-
-        if (response.ok) {
-          payload = await response.json();
-          usedFallback = modelIndex > 0;
-          break;
-        }
-
-        if (response.status !== 503 || attempt === 1) {
-          payload = await response.json();
-          break;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 700));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      try {
+        response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + models[modelIndex] + ":generateContent?key=" + encodeURIComponent(apiKey), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: requestBody,
+          signal: controller.signal
+        });
+      } catch (networkError) {
+        lastNetworkError = networkError;
+        response = undefined;
+      } finally {
+        clearTimeout(timeoutId);
       }
 
-      if (response?.ok || (response && response.status !== 503)) break;
+      if (response?.ok) {
+        payload = await response.json();
+        usedFallback = modelIndex > 0;
+        break;
+      }
+      if (response && response.status !== 503) {
+        payload = await response.json();
+        break;
+      }
     }
 
     if (!response) {
       return res.status(502).json({
         error: lastNetworkError?.name === "AbortError"
-          ? "The AI provider did not respond before the timeout. Please try again later."
+          ? "The AI provider did not respond within 12 seconds. Please try again later."
           : "Could not connect to the AI provider. Please try again later."
       });
     }

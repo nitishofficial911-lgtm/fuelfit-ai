@@ -90,7 +90,8 @@ Use kcal for calories and grams for nutrients. All numeric values must be non-ne
     result.foodName = String(result.foodName || "Food estimate").slice(0, 100);
     result.serving = String(result.serving || "Visible portion; amount uncertain").slice(0, 160);
     result.confidence = ["Low", "Medium", "High"].includes(result.confidence) ? result.confidence : "Low";
-    result.note = String(result.note || "Nutrition values are estimates from the photo.").slice(0, 300);\n    if (usedFallback) result.note += " (Backup AI model used.)";
+    result.note = String(result.note || "Nutrition values are estimates from the photo.").slice(0, 300);
+    if (usedFallback) result.note += " (Backup AI model used.)";
     return res.status(200).json(result);
   } catch (error) {
     return res.status(500).json({ error: error.message || "Could not analyse this photo. Please try again." });

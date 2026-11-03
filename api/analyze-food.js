@@ -29,12 +29,12 @@ export default async function handler(req, res) {
 }
 Use kcal for calories and grams for nutrients. All numeric values must be non-negative. If the image is not food, set foodName to "Food not recognised", calories and nutrient values to 0, confidence to "Low", and explain in note. Estimates are approximate, not medical advice.`;
 
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey), {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(apiKey), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ inline_data: { mime_type: type, data: image }, }, { text: prompt }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+        contents: [{ parts: [{ inlineData: { mimeType: type, data: image }, }, { text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
       })
     });
 
